@@ -44,7 +44,7 @@ import os
 from imUtils import *
 from segUtils import *
 from postUtils import *
-import ipdb
+
 
 def main(base, parallel, model):
 	affine_transform(base)
