@@ -5,7 +5,7 @@ import CTtools
 import nibabel as nib
 from subprocess import call
 import sys
-import ipdb
+
 
 ct_scan_path = str(sys.argv[1])
 if 'Ashu' in ct_scan_path:
