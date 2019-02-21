@@ -1,4 +1,4 @@
-## White Matter, Ventricle and Subarachnoid Space Segmentation of CT scans, with Normal Pressure Hydrocephalus Predicton
+## White Matter, Ventricle and Subarachnoid Space Segmentation of CT scans, with Normal Pressure Hydrocephalus Prediction
 
 
 Code implementing the algorithm described in the paper 
