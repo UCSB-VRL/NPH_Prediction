@@ -1,41 +1,41 @@
 ###############################################################################
-##  Vision Research Laboratory and                                           ##
-##  Center for Multimodal Big Data Science and Healthcare                    ##
-##  University of California at Santa Barbara                                ##
+##	Vision Research Laboratory and											 ##
+##	Center for Multimodal Big Data Science and Healthcare					 ##
+##	University of California at Santa Barbara								 ##
 ## ------------------------------------------------------------------------- ##
-##                                                                           ##
-##     Copyright (c) 2019                                                    ##
-##     by the Regents of the University of California                        ##
-##                            All rights reserved                            ##
-##                                                                           ##
-## Redistribution and use in source and binary forms, with or without        ##
-## modification, are permitted provided that the following conditions are    ##
-## met:                                                                      ##
-##                                                                           ##
-##     1. Redistributions of source code must retain the above copyright     ##
-##        notice, this list of conditions, and the following disclaimer.     ##
-##                                                                           ##
-##     2. Redistributions in binary form must reproduce the above copyright  ##
-##        notice, this list of conditions, and the following disclaimer in   ##
-##        the documentation and/or other materials provided with the         ##
-##        distribution.                                                      ##
-##                                                                           ##
-##                                                                           ##
-## THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDER> "AS IS" AND ANY           ##
-## EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE         ##
-## IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR        ##
-## PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> OR           ##
-## CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,     ##
-## EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,       ##
-## PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR        ##
-## PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF    ##
-## LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING      ##
-## NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS        ##
-## SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.              ##
-##                                                                           ##
-## The views and conclusions contained in the software and documentation     ##
-## are those of the authors and should not be interpreted as representing    ##
-## official policies, either expressed or implied, of <copyright holder>.    ##
+##																			 ##
+##	   Copyright (c) 2019													 ##
+##	   by the Regents of the University of California						 ##
+##							  All rights reserved							 ##
+##																			 ##
+## Redistribution and use in source and binary forms, with or without		 ##
+## modification, are permitted provided that the following conditions are	 ##
+## met:																		 ##
+##																			 ##
+##	   1. Redistributions of source code must retain the above copyright	 ##
+##		  notice, this list of conditions, and the following disclaimer.	 ##
+##																			 ##
+##	   2. Redistributions in binary form must reproduce the above copyright  ##
+##		  notice, this list of conditions, and the following disclaimer in	 ##
+##		  the documentation and/or other materials provided with the		 ##
+##		  distribution.														 ##
+##																			 ##
+##																			 ##
+## THIS SOFTWARE IS PROVIDED BY <COPYRIGHT HOLDER> "AS IS" AND ANY			 ##
+## EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE		 ##
+## IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR		 ##
+## PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> OR			 ##
+## CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,	 ##
+## EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,		 ##
+## PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR		 ##
+## PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF	 ##
+## LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING		 ##
+## NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS		 ##
+## SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.				 ##
+##																			 ##
+## The views and conclusions contained in the software and documentation	 ##
+## are those of the authors and should not be interpreted as representing	 ##
+## official policies, either expressed or implied, of <copyright holder>.	 ##
 ###############################################################################
 
 import numpy as np
@@ -49,19 +49,25 @@ from sklearn.ensemble import RandomForestClassifier as rf_classifier
 from sklearn import preprocessing
 
 
-def get_volumes(BASE):
+def get_volumes(BASE, save_last=False):
 	'''
 	Obtains the volumes of the ventricle, subarachnoid space, and white matter given segmentations.
 	Volumes are output in a csv file.
 	'''
 	imnames = pickle.load(open(os.path.join(BASE,'imname_list.pkl')))
 	imnames.sort()
-	f = open(os.path.join(BASE,'volumes.csv'), 'wb')
+	volume_csv = os.path.join(BASE, 'volumes.csv')
+	csv_exists = os.path.exists(volume_csv)
+	if save_last:
+		f = open(volume_csv, 'ab')
+	else:
+		f = open(volume_csv, 'wb')
 	writer = csv.writer(f)
+	if not csv_exists or not save_last:
+		writer.writerow(['Scan', 'Vent', 'Sub', 'White'])
 	ventricle_volumes = []
 	sub_volumes = []
 	white_volumes = []
-	writer.writerow(['Scan', 'Vent', 'Sub', 'White'])
 
 	for imname in imnames:
 		imname_short = os.path.split(imname)[-1]
@@ -111,7 +117,8 @@ def make_prediction(BASE, model='rf'):
 		clf = pickle.load(f)
 	#load and process ratio data from csv file
 	dfvol = pandas.read_csv(os.path.join(BASE, 'volumes.csv'))
-	f = open(os.path.join(BASE,'predictions_' + model + '.csv'), 'wb')
+	predictions_csv = os.path.join(BASE,'predictions_' + model + '.csv')
+	f = open(predictions_csv, 'wb')
 	writer = csv.writer(f)
 	for _, corresp_row_ratio in dfvol.iterrows():
 		prediction = 'no NPH'
@@ -129,7 +136,15 @@ def make_prediction(BASE, model='rf'):
 	f.close()
 
 
-
-	
+def clean_up(BASE):
+	'''
+	Cleans up files from image processing pipeline.
+	'''
+	os.remove('imname_list.pkl')
+	os.remove('imname_list1.pkl')
+	os.remove('imname_affine.pkl')
+	os.remove('imname_affine1.pkl')
+	os.remove('imname_header.pkl')
+	os.remove('imname_header1.pkl')
 
 

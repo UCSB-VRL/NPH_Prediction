@@ -3,7 +3,7 @@
 
 Code implementing the algorithm described in the paper 
 
-*Zhang et. al., Fully Automated Volumetric Classification in CT Scans for Diagnosis and Analysis of Normal Pressure Hydrocephalus*
+*Zhang et. al., Fully Automated Volumetric Classification in CT Scans for Diagnosis and Analysis of Normal Pressure Hydrocephalus. https://arxiv.org/abs/1901.09088*
 
 
 ### Requirements

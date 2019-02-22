@@ -69,7 +69,7 @@ bspline_path = os.path.join(os.getcwd(), 'Par0000bspline.txt')
 
 nameOfAffineMatrix = ct_scan_path[:ct_scan_path.find('.nii.gz')]+'_affine.mat'
 
-print('The location of MNI152 bone:' , MNI_152_bone)
+#print('The location of MNI152 bone:' , MNI_152_bone)
 
 # if you want to do ct scan removal 
 #ct_scan_wodevice = CTtools.removeCTscandevice(ct_scan_path)
