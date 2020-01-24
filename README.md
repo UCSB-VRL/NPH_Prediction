@@ -55,9 +55,10 @@ head CT scans: a retrospective study. DOI:https://doi.org/10.1016/S0140-6736(18)
 Angela Zhang
 
 ##### Contributors
-Po-yu Kao, CT registration
+Po-yu Kao, CT registration, UNet pretraining
 
 Austin Mcever, testing
 
 ##### Acknowledgements
 Thanks to the Vision Research Laboratory at the University of California, Santa Barbara; Dr. Ashu Shelat at the Cottage Hospital of Santa Barbara; and Dr. Jeff Chen at the University of California, Irvine for their help and support.
+

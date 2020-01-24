@@ -41,8 +41,8 @@
 import numpy as np
 import nibabel as nib
 import pickle
-import csv
 import os
+import warnings
 from skimage.draw import ellipse
 from cv2 import fastNlMeansDenoising as denoising
 from scipy.ndimage import binary_dilation as dilation
@@ -52,72 +52,183 @@ from scipy.ndimage import binary_closing as closing
 from sklearn.ensemble import RandomForestClassifier
 from skimage.draw import ellipse
 from skimage.filters import gaussian, median
-from skimage.morphology import disk
+from skimage.morphology import disk, convex_hull_image
 from skimage.segmentation import morphological_chan_vese as mcv
 from joblib import Parallel, delayed
 from scipy.ndimage import binary_fill_holes as fill_holes
 
 
-def subarachnoid_seg(BASE, parallel):
+def threshold(BASE, folder, parallel):
+	'''
+	Classification of tissue types in CT scan.
+	'''
+	classifier_name = os.path.join(BASE, 'TissueClassifier.pkl')
+	if not os.path.exists(os.path.join(BASE, 'Thresholds')):
+		os.mkdir(os.path.join(BASE, 'Thresholds'))
+	#load tissue classifier
+	with open(classifier_name, 'rb') as f:
+		clf = pickle.load(f)
+	fpath = os.path.join(BASE,folder)
+	imnames = [os.path.join(BASE, 'Scans', f) for f in os.listdir(fpath) if (f.endswith('.nii.gz') or f.endswith('.nii'))]
+	imnames.sort()
+	with open(os.path.join(BASE, 'imname_list.pkl'), 'wb') as f:
+		pickle.dump(imnames, f)
+
+	# Apply Threshold
+	print('-------- Applying Threshold --------')
+	def apply_thresh(i):
+		imname = imnames[i]
+		imname_short = os.path.split(imname)[-1]
+		print(imname_short)
+		threshold_namev = os.path.join(BASE, 
+									'Thresholds', 
+									imname_short[:imname_short.find('.nii.gz')] +'.thresholdedv.nii.gz')
+		threshold_namec = os.path.join(BASE,
+									'Thresholds',
+									imname_short[:imname_short.find('.nii.gz')] +'.thresholdedc.nii.gz')
+		short_tnamev = os.path.split(threshold_namev)[-1]
+		short_tnamec = os.path.split(threshold_namec)[-1]
+		if short_tnamev in os.listdir(os.path.join(BASE, 'Thresholds')):
+			if short_tnamec in os.listdir(os.path.join(BASE, 'Thresholds')):
+				return
+		if not os.path.exists(imname):
+			print('does not exist')
+			return
+		im = nib.load(imname)
+		image = im.get_data()
+		image[np.where(image > 127)] = 127
+		image[np.where(image < -128)] = -1000
+		#denoising
+		for s in range(0, image.shape[2]):
+			slic = image[:,:,s]
+			slic = np.uint8(slic)
+			slic = denoising(slic, h=5)
+			image[:,:,s] = np.float64(slic)
+		#done denoising
+		affine = im.affine
+		header = im.header
+		xsize, ysize, zsize = image.shape
+		x = image.flatten()
+		x_predict = x.reshape(-1,1)
+		x_predict = x_predict.astype(float)
+		y = clf.predict(x_predict)
+		skull = np.copy(y)
+		yv = np.copy(y)
+		yc = np.copy(y)
+		yv[np.where(yv != 1)[0]] = 0
+		yc[np.where(yc != 2)[0]] = 0
+		yc[np.where(yc == 2)[0]] = 1
+		skull[np.where(skull != 3)[0]] = -1
+		skull[np.where(skull == 3)[0]] = 1
+		threshold_imgv = yv.reshape(image.shape)
+		threshold_imgc = yc.reshape(image.shape)
+		skull_img = skull.reshape(image.shape)
+		structure = np.array([[1,1,1],[1,1,1],[1,1,1]])
+		threshold_imgv[np.where(threshold_imgv < 0.5)] = -1
+		threshold_imgv[np.where(threshold_imgc > 0.5)] = -1
+		threshold_imgc[np.where(threshold_imgc < 0.5)] = -1
+		threshold_imgc[np.where(threshold_imgv > 0.5)] = -1
+		skull_name = os.path.join(BASE, 
+								'Thresholds', 
+								imname_short[:imname_short.find('.nii.gz')]+'.skull.nii.gz')
+		nii_imagev = nib.Nifti1Image(threshold_imgv.astype(np.float32), affine, header)
+		nii_imagec = nib.Nifti1Image(threshold_imgc.astype(np.float32), affine, header)
+		skull_image = nib.Nifti1Image(skull_img.astype(np.float32), affine, header)
+		nib.save(nii_imagev, threshold_namev)
+		nib.save(nii_imagec, threshold_namec)
+		nib.save(skull_image, skull_name)
+		print('done thresholding: ' + imname)
+
+	if parallel:
+		Parallel(n_jobs=4)(delayed(apply_thresh)(i) for i in range(0, len(imnames)))
+	else:
+		for i in range(0, len(imnames)):
+			apply_thresh(i)
+
+
+def subarachnoid_seg(BASE, seg_model, parallel):
 	'''
 	Segments the subarachnoid space after white matter and ventricle segmentation.
 	'''
-	imnames = pickle.load(open(os.path.join(BASE,'imname_list.pkl')))
+	print('---------------- Subarachnoid Segmentation ------------------')
+	imnames = pickle.load(open(os.path.join(BASE,'imname_list.pkl'), 'rb'))
 	imnames.sort()
+
 	def subseg(i):
 		imname = imnames[i]
 		imname_short = os.path.split(imname)[-1]
-		print imname_short
-		threshold_name = os.path.join(BASE,
+		print(imname_short)
+		if seg_model == 'mcv':
+			threshold_name = os.path.join(BASE,
 									'Thresholds',
-									imname_short[:imname_short.find('_MNI152.nii.gz')] + '.skull.nii.gz')
-		new_name = threshold_name[:threshold_name.find('.skull.nii.gz')] + '.skull1.nii.gz'
+									imname_short[:imname_short.find('.nii.gz')] + '.skull.nii.gz')
+			new_name = threshold_name[:threshold_name.find('.skull.nii.gz')] + '.skull1.nii.gz'
+		else:
+			threshold_name = os.path.join(BASE, 'UNet_Outputs', imname_short[:imname_short.find('.nii.gz')] + '.segmented.nii.gz')
+			new_name = os.path.join(BASE, 'Thresholds', imname_short[:imname_short.find('.nii.gz')] + '.brain.nii.gz')
 		if not os.path.exists(threshold_name):
-			print 'skipped due to no threshold'
+			print('skipped due to no threshold')
 			return
 		threshold_image = nib.load(threshold_name)
 		threshold_array = threshold_image.get_data()
-
 		threshold_namev = os.path.join(BASE,
 									'Thresholds',
-									imname_short[:imname_short.find('_MNI152.nii.gz')] + '.thresholdedv.nii.gz')
+									imname_short[:imname_short.find('.nii.gz')] + '.thresholdedv.nii.gz')
 		threshold_imagev = nib.load(threshold_namev)
 		varray = threshold_imagev.get_data()
-	
+		if seg_model == 'unet':
+			final_pred = 'UNet_Outputs'
+		else:
+			final_pred = 'Final_Predictions'
 		segment_name = os.path.join(BASE,
-									'Final_Predictions',
+									final_pred,
 									imname_short[:imname_short.find('.nii.gz')] + '.segmented.nii.gz')
-		orig_vname = os.path.join(BASE,
-									'Predictions',
-									imname_short[:imname_short.find('.nii.gz')] + '.segmentedv150.nii.gz')
+		#orig_vname = os.path.join(BASE,
+		#							'Predictions',
+		#							imname_short[:imname_short.find('.nii.gz')] + '.segmentedv150.nii.gz')
 		new_segname = segment_name[:segment_name.find('.nii.gz')] + '1.nii.gz'
 		if not os.path.exists(segment_name):
-			print 'skipped due to no segment'
+			print('skipped due to no segment')
+			return
+		if os.path.exists(new_segname):
 			return
 		segment_img = nib.load(segment_name)
 		segment_array = segment_img.get_data()
-		orig_vimg = nib.load(orig_vname)
-		orig_varray = orig_vimg.get_data()
+		#orig_vimg = nib.load(orig_vname)
+		#orig_varray = orig_vimg.get_data()
 		thresh_filled = np.copy(threshold_array)
 		thresh_filled[np.where(threshold_array<0)] = 0
 		thresh_filled[np.where(segment_array>0)] = 1
-		for s in range(65, 182):
+		if seg_model == 'unet':
+			c_matter_z = np.where(segment_array==2)[2]
+			if c_matter_z.size == 0:
+				print('skipping due to no vent in segment')
+				return
+			r = range(c_matter_z.min(), c_matter_z.max())
+		else:
+			r = range(65, 182)
+		for s in r:
 			slic = thresh_filled[:,:,s]
 			slic = fill_holes(slic)
 			thresh_filled[:,:,s] = slic
 		for s in range(0, thresh_filled.shape[2]):
 			slic = thresh_filled[:,:,s]
-			segslic = segment_array[:,:,s]
-			seg_inds = np.where(segslic>0.5)
-			if len(seg_inds[0]) < 1:
-				thresh_filled[:,:,s] = 0
-				continue
-			x_min = np.min(seg_inds[0])
-			x_max = np.max(seg_inds[0])
-			y_min = np.min(seg_inds[1])
-			y_max = np.max(seg_inds[1])
-			slic[0:x_min,:] = 0
-			slic[:,0:y_min] = 0
+			if seg_model == 'unet':
+				with warnings.catch_warnings():
+					warnings.simplefilter("ignore")
+					slic = convex_hull_image(slic)
+			else:
+				segslic = segment_array[:,:,s]
+				seg_inds = np.where(segslic > 0.5)
+				if len(seg_inds[0]) < 1:
+					thresh_filled[:,:,s] = 0
+					continue
+				x_min = np.min(seg_inds[0])
+				x_max = np.max(seg_inds[0])
+				y_min = np.min(seg_inds[1])
+				y_max = np.max(seg_inds[1])
+				slic[0:x_min,:] = 0
+				slic[:,0:y_min] = 0
 			thresh_filled[:,:,s] = slic
 		subarray = np.copy(varray)
 		subarray[np.where(segment_array > 0)] = 0
@@ -128,13 +239,14 @@ def subarachnoid_seg(BASE, parallel):
 		new_thresholdv = nib.Nifti1Image(varray, threshold_imagev.affine, threshold_imagev.header)
 		new_tnamev = os.path.join(BASE,
 								'Thresholds',
-								imname_short[:imname_short.find('_MNI152.nii.gz')] + '.thresholdedv1.nii.gz')
+								imname_short[:imname_short.find('.nii.gz')] + '.thresholdedv1.nii.gz')
 		nib.save(new_thresholdv, new_tnamev)
 
 		segment_array[np.where(subarray > 0.5)] = 3
-		segment_array[np.where((varray==1) & (orig_varray==1))] = 2
+		segment_array[np.where((varray==1) & (segment_array==1))] = 3
 
-		segment_array[:,:,0:40] = 0
+		if seg_model == 'mcv':
+			segment_array[:,:,0:40] = 0
 
 		segment_img = nib.Nifti1Image(segment_array, segment_img.affine, segment_img.header)
 		filled_image = nib.Nifti1Image(thresh_filled, threshold_image.affine, threshold_image.header)
@@ -153,7 +265,7 @@ def combine_thresh(BASE):
 	'''
 	Combines White Matter and CSF threshold masks.
 	'''
-	imnames = pickle.load(open('imname_list1.pkl', 'rb'))
+	imnames = pickle.load(open('imname_list1.pkl', 'rb'), encoding='latin1')
 	imnames.sort()
 	segfiles = os.listdir(os.path.join(BASE, 'Thresholds'))
 
@@ -162,7 +274,7 @@ def combine_thresh(BASE):
 		if 'NAV' in imname:
 			continue
 		imname_short = os.path.split(imname)[-1]
-		print str(count) + ': ' + imname_short
+		print(str(count) + ': ' + imname_short)
 		count += 1
 		vsegname = os.path.join(BASE, 
 					'Thresholds',
@@ -171,7 +283,7 @@ def combine_thresh(BASE):
 					'Thresholds',
 					imname_short[:imname_short.find('_MNI152.nii.gz')] + '.thresholdedc.nii.gz')
 		if os.path.split(vsegname)[-1] not in segfiles or os.path.split(csegname)[-1] not in segfiles:
-			print 'skipped'
+			print('skipped')
 			continue
 		vsegimg = nib.load(vsegname)
 		vsegarr = vsegimg.get_data()
@@ -209,7 +321,7 @@ def combine_segs(BASE):
 		if 'NAV' in imname:
 			continue
 		imname_short = os.path.split(imname)[-1]
-		print str(count) + ': ' + imname_short
+		print(str(count) + ': ' + imname_short)
 		count += 1
 		vsegname = os.path.join(BASE, 
 					'Predictions',
@@ -218,7 +330,7 @@ def combine_segs(BASE):
 					'Predictions',
 					imname_short[:imname_short.find('.nii.gz')] + '.segmentedc150.nii.gz')
 		if os.path.split(vsegname)[-1] not in segfiles or os.path.split(csegname)[-1] not in segfiles:
-			print 'skipped'
+			print('skipped')
 			continue
 		vsegimg = nib.load(vsegname)
 		vsegarr = vsegimg.get_data()
@@ -227,7 +339,6 @@ def combine_segs(BASE):
 
 		csegimg = nib.load(csegname)
 		csegarr = csegimg.get_data()
-		#csegarr = closing(csegarr) 
 		vsegarr[np.where(csegarr > 0)] = 0
 
 		segarr = vsegarr + 2*csegarr
@@ -239,47 +350,13 @@ def combine_segs(BASE):
 		nib.save(segimg, segname)
 
 
-def train_tissue_classifier(BASE, classifier_name='TissueClassifier.pkl'):
-	'''
-	Trains Random Forest classifier to classify tissue types.
-	To use, place labeled masks in folder named 'Classifiers' with name matching the corresponding images in the 'Scans' folder, but with the name ending in 'RFSeg.nii.gz' instead of '.nii.gz'.
-	'''
-	x = []
-	y = []
-	seg_image_names = [name for name in os.listdir(os.path.join(BASE, 'Classifiers')) if name.endswith('RFSeg.nii.gz')]
-	for i in range(0,len(seg_image_names)):
-		seg_image_name = seg_image_names[i]
-		image_name = seg_image_name[:seg_image_name.find('.RFSeg.nii.gz')] + '.nii.gz'
-		print image_name
-		image = nib.load(os.path.join(BASE, 'Scans', image_name))
-		seg_image = nib.load(os.path.join(BASE, 'Classifiers', seg_image_name))
-		np_image = image.get_data()
-		np_segimage = seg_image.get_data()
-		#foreground = np_image[np.where(np_image > -500)]
-		classes = np.unique(np_segimage)[1:]
-		for c in classes:
-			xind, yind, zind = np.where(np_segimage==c)
-			for i in range(0, xind.shape[0]):
-				x.append(np_image[xind[i],yind[i],zind[i]])
-				y.append(c)
-	x = np.array(x)
-	print x.shape
-	x = x.reshape(-1,1)
-	y = np.array(y)
-	x = x.astype(float)
-	y = y.astype(float)
-	clf = RandomForestClassifier(n_estimators=30, max_depth=30)
-	clf.fit(x, y)
-	with open(os.path.join(BASE, classifier_name), 'wb') as f:
-		pickle.dump(clf, f)
-
-
 def modify_image(seg_name, imname, segclass):
 	'''
 	Modifies the segmentation in the case of previous stroke.
 	'''
 	seg_img = nib.load(seg_name)
 	segarray = seg_img.get_data()
+	'''
 	if segclass == 'v':
 		xsize, ysize, zsize = segarray.shape
 		if np.sum(segarray) > 90000:
@@ -305,6 +382,7 @@ def modify_image(seg_name, imname, segclass):
 				slic = segarray[:,:,z]
 				slic = dilation(slic, iterations=5)
 				segarray[:,:,z] == slic
+	'''
 	new_segimg = nib.Nifti1Image(segarray, seg_img.affine, seg_img.header)
 	new_segname = seg_name[:seg_name.find('.nii.gz')]+'_1.nii.gz'
 	nib.save(new_segimg, new_segname)
@@ -323,9 +401,9 @@ def snake_seg(BASE, PARALLEL=True, segclass='v'):
 	with open(classifier_name, 'rb') as f:
 		clf = pickle.load(f)
 
-	affine_dict = pickle.load(open(os.path.join(BASE, 'imname_affine.pkl')))
-	header_dict = pickle.load(open(os.path.join(BASE, 'imname_header.pkl')))
-	imnames = pickle.load(open(os.path.join(BASE, 'imname_list.pkl')))
+	affine_dict = pickle.load(open(os.path.join(BASE, 'imname_affine.pkl'), 'rb'))
+	header_dict = pickle.load(open(os.path.join(BASE, 'imname_header.pkl'), 'rb'))
+	imnames = pickle.load(open(os.path.join(BASE, 'imname_list.pkl'), 'rb'))
 	imnames.sort()
 
 	# Apply Threshold
@@ -333,20 +411,20 @@ def snake_seg(BASE, PARALLEL=True, segclass='v'):
 	def apply_thresh(i):
 		imname = imnames[i]
 		imname_short = os.path.split(imname)[-1]
-		print imname_short
+		print(imname_short)
 		threshold_namev = os.path.join(BASE, 
 									'Thresholds', 
-									imname_short[:imname_short.find('_MNI152.nii.gz')]+'.thresholdedv.nii.gz')
+									imname_short[:imname_short.find('.nii.gz')]+'.thresholdedv.nii.gz')
 		threshold_namec = os.path.join(BASE,
 									'Thresholds',
-									imname_short[:imname_short.find('_MNI152.nii.gz')]+'.thresholdedc.nii.gz')
+									imname_short[:imname_short.find('.nii.gz')]+'.thresholdedc.nii.gz')
 		short_tnamev = os.path.split(threshold_namev)[-1]
 		short_tnamec = os.path.split(threshold_namec)[-1]
 		if short_tnamev in os.listdir(os.path.join(BASE, 'Thresholds')):
 			if short_tnamec in os.listdir(os.path.join(BASE, 'Thresholds')):
 				return
 		if not os.path.exists(imname):
-			print 'does not exist'
+			print('does not exist')
 			return
 		image = nib.load(imname).get_data()
 		image[np.where(image > 127)] = 127
@@ -376,14 +454,14 @@ def snake_seg(BASE, PARALLEL=True, segclass='v'):
 		threshold_imgc[np.where(threshold_imgv > 0.5)] = -1
 		skull_name = os.path.join(BASE, 
 								'Thresholds', 
-								imname_short[:imname_short.find('_MNI152.nii.gz')]+'.skull.nii.gz')
+								imname_short[:imname_short.find('.nii.gz')]+'.skull.nii.gz')
 		nii_imagev = nib.Nifti1Image(threshold_imgv.astype(np.float32), affine, header)
 		nii_imagec = nib.Nifti1Image(threshold_imgc.astype(np.float32), affine, header)
 		skull_image = nib.Nifti1Image(skull_img.astype(np.float32), affine, header)
 		nib.save(nii_imagev, threshold_namev)
 		nib.save(nii_imagec, threshold_namec)
 		nib.save(skull_image, skull_name)
-		print 'done thresholding: ' + imname
+		print('done thresholding: ' + imname)
 
 	if PARALLEL:
 		Parallel(n_jobs=4)(delayed(apply_thresh)(i) for i in range(0, len(imnames)))
@@ -414,13 +492,13 @@ def snake_seg(BASE, PARALLEL=True, segclass='v'):
 		imname1 = os.path.split(imname)[-1]
 		threshold_name = os.path.join(BASE, 
 									'Thresholds', 
-									imname1[:imname1.find('_MNI152.nii.gz')]+'.thresholded' + segclass + '.nii.gz')
+									imname1[:imname1.find('.nii.gz')]+'.thresholded' + segclass + '.nii.gz')
 		seg_name = os.path.join(BASE, 
 								'Predictions', 
 								imname1[:imname1.find('.nii.gz')]+'.segmented' + segclass + '0.nii.gz')
 		if os.path.exists(seg_name):
 			return
-		print 'starting segmentation: ' + imname
+		print('starting segmentation: ' + imname)
 
 		timg = nib.load(threshold_name).get_data()
 	
@@ -542,7 +620,7 @@ def snake_seg(BASE, PARALLEL=True, segclass='v'):
 								imname1[:imname1.find('.nii.gz')] + '.segmented' + segclass + str(len(evolution)-1) + '.nii.gz')
 		modify_image(seg_name, imname, segclass)	
 
-		print 'completed segmentation: ' + imname1
+		print('completed segmentation: ' + imname1)
 
 
 	if PARALLEL:

@@ -1,4 +1,3 @@
-
 import numpy as np
 import os
 import CTtools
@@ -6,12 +5,9 @@ import nibabel as nib
 from subprocess import call
 import sys
 
-
 ct_scan_path = str(sys.argv[1])
-if 'Ashu' in ct_scan_path:
-	BASE = 'Ashu_Files'
-else:
-	BASE = ''
+
+BASE = ''
 MNI_152 = os.path.join(os.getcwd(),'MNI152_T1_1mm.nii.gz')
 nameOfAffineMatrix = ct_scan_path[:ct_scan_path.find('.nii.gz')]+'_affine.mat'
 nameOfInvMatrix = ct_scan_path[:ct_scan_path.find('.nii.gz')]+'_inverse.mat'
@@ -33,4 +29,5 @@ try:
 
 except:
 	print 'something did not work'
+
 
