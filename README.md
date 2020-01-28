@@ -26,9 +26,13 @@ The main function nph_prediction.py takes three arguments from the command line:
 
 directory `--directory=</path/to/directory>`, 
 
-model `--model=<model>`, where `<model>` can be `rf`, `linear_svm`, or `rbf_svm`, and 
+seg_model `--seg_model=<model>`, where `<model>` can be `unet` or `mcv`,
 
-`--parallel`, which is `True` if typed and `False` otherwise.
+nph_model `--nph_model=<model>`, where `<model>` can be `rf`, `linear_svm`, or `rbf_svm`
+
+`--parallel`, which is `False` if typed and `True` otherwise, and
+
+`--gpu`, which is `False` if typed and `True` otherwise.
 
 To run with default settings (recommended), type
 ```
