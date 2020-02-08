@@ -22,17 +22,15 @@ Note that there is a current known bug to using FSL which requires the user to m
 
 All of the CT scans must be in compressed nifti (.nii.gz) format, in a folder named 'Scans'.
 Please note the directory containing the 'Scans' folder and use that as an argument `--directory=</path/to/directory>` when running the code.
-The main function nph_prediction.py takes three arguments from the command line: 
+The main function nph_prediction.py takes the following arguments from the command line: 
 
 directory `--directory=</path/to/directory>`, 
 
 seg_model `--seg_model=<model>`, where `<model>` can be `unet` or `mcv`,
 
-nph_model `--nph_model=<model>`, where `<model>` can be `rf`, `linear_svm`, or `rbf_svm`
+`--parallel`, which is `True` if typed and `False` otherwise, and
 
-`--parallel`, which is `False` if typed and `True` otherwise, and
-
-`--gpu`, which is `False` if typed and `True` otherwise.
+`--gpu`, which is `True` if typed and `False` otherwise.
 
 To run with default settings (recommended), type
 ```

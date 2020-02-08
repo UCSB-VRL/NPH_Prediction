@@ -57,7 +57,10 @@ def get_volumes(BASE, seg_model, save_last=False):
 	print('------------ getting volumes ---------------')
 	imnames = pickle.load(open(os.path.join(BASE,'imname_list.pkl'), 'rb'))
 	imnames.sort()
-	volume_csv = os.path.join(BASE, 'volumes.csv')
+	if seg_model == 'mcv':
+		volume_csv = os.path.join(BASE, 'volumes_mcv.csv')
+	elif seg_model == 'unet':
+		volume_csv = os.path.join(BASE, 'volumes_unet.csv')
 	csv_exists = os.path.exists(volume_csv)
 	if save_last:
 		f = open(volume_csv, 'a')
@@ -113,19 +116,24 @@ def get_volumes(BASE, seg_model, save_last=False):
 	f.close()
 
 
-def make_prediction(BASE, model='rf'):
+def make_prediction(BASE, seg_model):
 	'''
 	Makes predictions of possible NPH/no NPH given the volume information obtained by get_volumes, output to predictions_$model$.csv.
 	model options: linear_svm, rbf_svm, rf
 	'''
 	print('------------ making prediction -------------')
 	#load classifier
-	classifier_name = '.'.join([model, 'pkl'])
+	if seg_model == 'mcv':
+		classifier_name = 'rbf_svm_mcv.pkl'
+		vol_name = 'volumes_mcv.csv'
+	else:
+		classifier_name = 'rbf_svm_unet.pkl'
+		vol_name = 'volumes_unet.csv'
 	with open(os.path.join(BASE, 'nph_classifiers', classifier_name), 'rb') as f:
-		clf = pickle.load(f, encoding='latin1')
+		clf = pickle.load(f)
 	#load and process ratio data from csv file
-	dfvol = pandas.read_csv(os.path.join(BASE, 'volumes.csv'))
-	predictions_csv = os.path.join(BASE,'predictions_' + model + '.csv')
+	dfvol = pandas.read_csv(os.path.join(BASE, vol_name))
+	predictions_csv = os.path.join(BASE,'predictions.csv')
 	f = open(predictions_csv, 'w')
 	writer = csv.writer(f)
 	for _, corresp_row_ratio in dfvol.iterrows():
@@ -134,8 +142,8 @@ def make_prediction(BASE, model='rf'):
 		vent = corresp_row_ratio['Vent']
 		sub = corresp_row_ratio['Sub']
 		white = corresp_row_ratio['White']
-		x = np.array([[vent, sub, white, vent+sub+white]])
-		x = preprocessing.scale(x[0]).reshape(1,-1)
+		x = np.array([[vent, sub, white, vent+sub+white]]).reshape(1,-1)
+		x = preprocessing.scale(x, axis=1)
 		predict_num = clf.predict(x)[0]
 		if predict_num == 1:
 			prediction = 'possible NPH'
@@ -150,6 +158,7 @@ def clean_up(BASE):
 	'''
 	names = ['imname_list.pkl', 'imname_list1.pkl', 'imname_affine.pkl', 'imname_affine1.pkl', 'imname_header.pkl', 'imname_header1.pkl']
 	for name in names:
+		name = os.path.join(BASE, name)
 		if os.path.exists(name):
 			os.remove(name)
 	

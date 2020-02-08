@@ -105,11 +105,16 @@ def unetPredict(BASE, gpu):
 	ckpt = 'model_last.tar'
 
 	unet = unet.Unet()
-	unet.cuda()
+	unet.cpu()
+	if gpu:
+		unet.cuda()
 
 
 	model_file = os.path.join(unet_model, ckpt)
-	checkpoint = torch.load(model_file)
+	if gpu:
+		checkpoint = torch.load(model_file, map_location=torch.device('gpu'))
+	else:
+		checkpoint = torch.load(model_file, map_location=torch.device('cpu'))
 	unet.load_state_dict(checkpoint['state_dict'])
 
 	'''Unet Definition'''
@@ -201,6 +206,8 @@ def unetPredict(BASE, gpu):
 	
 	reload_path = os.path.join(BASE, 'unet_model.pt')
 	net.load_state_dict(torch.load(reload_path))
+
+	net.cpu()
 	if gpu:
 		net.cuda()
 

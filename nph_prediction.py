@@ -47,7 +47,7 @@ from postUtils import *
 from unetSeg import *
 
 
-def main(base, parallel, seg_model, nph_model, gpu, save_last, clear_cache):
+def main(base, parallel, seg_model, gpu, save_last, clear_cache):
 	if clear_cache:
 		from subprocess import call
 		call(['rm', '-r', os.path.join(base, 'Thresholds')])
@@ -69,7 +69,7 @@ def main(base, parallel, seg_model, nph_model, gpu, save_last, clear_cache):
 			combine_segs(base)
 		subarachnoid_seg(base, seg_model, parallel)
 		get_volumes(base, seg_model, save_last)
-		make_prediction(base, nph_model)
+		make_prediction(base, seg_model)
 		clean_up(base)
 	
   
@@ -77,12 +77,11 @@ if __name__== "__main__":
 	parser = argparse.ArgumentParser()
 	parser.add_argument('--directory', default='')
 	parser.add_argument('--seg_model', default='unet', help='unet or mcv')
-	parser.add_argument('--nph_model', default='rbf_svm', help= 'rf, linear_svm, or rbf_svm')
-	parser.add_argument('--parallel', action='store_true', default=True)
-	parser.add_argument('--gpu', action='store_true', default=True)
+	parser.add_argument('--parallel', action='store_true', default=False)
+	parser.add_argument('--gpu', action='store_true', default=False)
 	parser.add_argument('--save_last', action='store_true', default=False, help='include this to append to previous csv analysis files')
 	parser.add_argument('--clear_cache', action='store_true', default=False, help='this will delete previous calculations')
 	args = parser.parse_args()
-	main(args.directory, args.parallel, args.seg_model, args.nph_model, args.gpu, args.save_last, args.clear_cache)
+	main(args.directory, args.parallel, args.seg_model, args.gpu, args.save_last, args.clear_cache)
 
 
