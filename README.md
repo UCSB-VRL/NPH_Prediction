@@ -13,9 +13,13 @@ To download all prerequisites, in the terminal type
 ```
 pip install -r requirements.txt
 ```
-FSL is needed to run this code. Please go to the FSL website at https://fsl.fmrib.ox.ac.uk/fsl/fslwiki to download their software.
+In order to use the morphological chan-vese model, FSL is needed to run this code. Please go to the FSL website at https://fsl.fmrib.ox.ac.uk/fsl/fslwiki to download their software.
 
 Note that there is a current known bug to using FSL which requires the user to manually install libopenblas.
+
+The unet model will not require FSL.
+
+The code has been tested only on python3.
 
 ### Usage
 
@@ -34,12 +38,12 @@ seg_model `--seg_model=<model>`, where `<model>` can be `unet` or `mcv`,
 
 To run with default settings (recommended), type
 ```
-python nph_prediction.py
+python3 nph_prediction.py
 ```
 
 For help on the settings, type
 ```
-python nph_prediction.py -h
+python3 nph_prediction.py -h
 ```
 
 The runtime is approximately 10 minutes per image.
