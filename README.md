@@ -19,7 +19,7 @@ Note that there is a current known bug to using FSL which requires the user to m
 
 The unet model will not require FSL.
 
-The code has been tested only on python3.
+The code has been tested only on python version 3.6.
 
 ### Usage
 
