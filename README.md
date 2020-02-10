@@ -17,7 +17,7 @@ In order to use the morphological chan-vese model, FSL is needed to run this cod
 
 Note that there is a current known bug to using FSL which requires the user to manually install libopenblas.
 
-The unet model will not require FSL.
+The unet model will not require FSL. However, it requires a large file, `unet_ce_hard_per_im_s8841_all/model_last.tar`, which can be downloaded manually on the github website or using `git-lfs`. 
 
 The code has been tested only on python version 3.6.
 

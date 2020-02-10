@@ -85,6 +85,6 @@ try:
 	call(['flirt', '-in', ct_scan_wodevice, '-ref', MNI_152, '-applyxfm', '-init', nameOfAffineMatrix, '-out', ct_scan_wodevice[:ct_scan_wodevice.find('.nii.gz')]+'_MNI152.nii.gz'])
 
 except:
-	print 'something did not work in CT2MNI152 for this image.'
+	print('something did not work in CT2MNI152 for this image.')
 
 
