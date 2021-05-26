@@ -117,3 +117,31 @@ def reverse_transform(BASE):
 			except:
 				print('transform didnt work')
 				continue
+
+
+def transform_heatmaps(BASE):
+	'''
+	Transforms heatmaps into original subject space.
+	'''
+	scanpath = os.path.join(BASE_FOLDER, 'Scans')
+	heatpath = os.path.join(BASE_FOLDER, 'Heatmaps')
+	transformed_heatpath = os.path.join(BASE_FOLDER, 'Transformed_Heatmaps')
+	heatimgs = os.listdir(heatpath)
+
+	if not os.path.exists(transformed_heatpath):
+		os.mkdir(transformed_heatpath)
+
+	for scanname in os.listdir(scanpath):
+		if scanname.endswith('.nii.gz') and 'MNI' not in scanname:
+			print(scanname)
+			subjectpath = os.path.join(scanpath, scanname)
+			affinename = scanname[:scanname.find('.nii.gz')] + '_MNI152.nii.gz'
+			if affinename not in os.listdir(scanpath):
+				continue
+			nameOfInvMatrix = subjectpath[:subjectpath.find('.nii.gz')] + '_inverse.mat'
+			nameOfAffineMatrix = subjectpath[:subjectpath.find('.nii.gz')] + '_affine.mat'
+			call(['convert_xfm', '-omat', nameOfInvMatrix, '-inverse', nameOfAffineMatrix])
+			for img in heatimgs:
+				impath = os.path.join(heatpath, img)
+				outpath = os.path.join(transformed_heatpath, img)
+				subprocess.call(['flirt','-in', impath, '-ref', subjectpath, '-applyxfm', '-init', nameOfInvMatrix, '-out', outpath, '-interp', 'nearestneighbour'])
