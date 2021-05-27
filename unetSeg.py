@@ -104,7 +104,7 @@ def unetPredict(BASE, gpu=False):
 	import models
 	from models import criterions, unet
 
-	unet_model = 'source/unet_ce_hard_per_im_s8841_all'
+	unet_model = 'source'
 	ckpt = 'model_last.tar'
 
 	unet = unet.Unet()

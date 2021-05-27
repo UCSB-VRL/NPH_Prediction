@@ -100,7 +100,8 @@ def reverse_transform(BASE):
 	'''
 	Transforms registered CT scans back to the original subject space.
 	'''
-	scanpath = os.path.join(BASE_FOLDER, 'Scans')
+	print('--------- Calculating Reverse Transforms ---------')
+	scanpath = os.path.join(BASE, 'Scans')
 	for scanname in os.listdir(scanpath):
 		if scanname.endswith('.nii.gz') and 'MNI' not in scanname:
 			print(scanname)
@@ -123,9 +124,9 @@ def transform_heatmaps(BASE):
 	'''
 	Transforms heatmaps into original subject space.
 	'''
-	scanpath = os.path.join(BASE_FOLDER, 'Scans')
-	heatpath = os.path.join(BASE_FOLDER, 'Heatmaps')
-	transformed_heatpath = os.path.join(BASE_FOLDER, 'Transformed_Heatmaps')
+	scanpath = os.path.join(BASE, 'Scans')
+	heatpath = os.path.join(BASE, 'Heatmaps')
+	transformed_heatpath = os.path.join(BASE, 'Transformed_Heatmaps')
 	heatimgs = os.listdir(heatpath)
 
 	if not os.path.exists(transformed_heatpath):

@@ -79,7 +79,7 @@ if __name__== "__main__":
 	parser.add_argument('--gpu', action='store_true', default=False)
 	parser.add_argument('--save_last', action='store_true', default=False, help='include this to append to previous csv analysis files')
 	parser.add_argument('--clear_cache', action='store_true', default=False, help='this will delete previous calculations')
-	parser.add_argument('--predict_nph', action='store_true', default=False)
+	parser.add_argument('--predict_nph', action='store_true', default=True)
 	args = parser.parse_args()
 	main(args.directory, args.use_heatmap, args.gpu, args.predict_nph, args.save_last, args.clear_cache)
 
