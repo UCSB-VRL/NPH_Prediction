@@ -4,10 +4,30 @@ import os
 from subprocess import call
 
 
+def transform_seg(BASE):
+	'''
+	Transforms segmentations to standard space for connectometry analysis.
+	'''
+	print('---------- Transforming Segmentations ----------')
+	MNI_152 = os.path.join(BASE, 'MNI152_T1_1mm.nii.gz')
+	segpath = os.path.join(BASE, 'UNet_Outputs')
+	affinepath = os.path.join(BASE, 'MNI152')
+	for seg in os.listdir(segpath):
+		full_segpath = os.path.join(segpath, seg)
+		affine_mtx = os.path.join(affinepath, seg[:seg.find('.nii.gz')]+'_affine.mat')
+		transformed_segpath = os.path.join(BASE, 'transformed_outputs')
+		if not os.path.exists(transformed_segpath):
+			os.mkdir(transformed_segpath)
+		transformed_name = os.path.join(transformed_segpath, seg)
+		call(['flirt', '-in', full_segpath, '-ref', MNI_152, '-applyxfm', '-init', affine_mtx, '-out', transformed_name])
+		
+
+
 def get_ventricles(BASE):
 	'''
 	Collects ventricles after segmentation, for connectomic analysis.
 	'''
+	print('---------- Collecting Ventricles ----------')
 	path = os.path.join(BASE, 'transformed_outputs')
 	outpath = os.path.join(BASE,'transformed_outputs','ventricles')
 
@@ -31,6 +51,7 @@ def run_connectometry(BASE):
 	'''
 	Outputs connectivity metrics of each patient.
 	'''
+	print('--------- running connectometry ----------')
 	segpath = os.path.join(BASE, 'transformed_outputs', 'ventricles')
 	dsistudio_path = os.path.join(BASE, 'dsistudio', 'build', 'dsi_studio')
 	fibpath = os.path.join(BASE, 'template.fib.gz.mean.fib.gz')

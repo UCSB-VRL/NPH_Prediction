@@ -59,14 +59,15 @@ def main(base, use_heatmap, gpu, predict_nph, save_last, clear_cache):
 	else:
 		if use_heatmap or predict_nph:
 			affine_transform(base) #done
-			reverse_transform(base) #done
+			reverse_transform(base) #done needs testing
 		if use_heatmap:
 			get_heatmaps(base) #done needs testing
 			unet_prob_conv(base, gpu) #Amil: make this take scans from 'Scans' folder, heatmaps from 'Transformed_Heatmaps' folder, and output segmentation in 'UNet_Outputs' folder. if gpu=True, use cuda
 		else:
 			unetPredict(base, gpu) #done
 		if predict_nph:
-			get_ventricles(base) #done needs testing
+			transform_seg(base) #done
+			get_ventricles(base) #done
 			run_connectomectry(base) #done needs testing
 			predict_NPH(base, gpu)
 		clean_up(base)
@@ -76,7 +77,7 @@ if __name__== "__main__":
 	parser = argparse.ArgumentParser()
 	parser.add_argument('--directory', default='')
 	parser.add_argument('--use_heatmap', action='store_true', default=False)
-	parser.add_argument('--gpu', action='store_true', default=False)
+	parser.add_argument('--gpu', action='store_true', default=True)
 	parser.add_argument('--save_last', action='store_true', default=False, help='include this to append to previous csv analysis files')
 	parser.add_argument('--clear_cache', action='store_true', default=False, help='this will delete previous calculations')
 	parser.add_argument('--predict_nph', action='store_true', default=True)

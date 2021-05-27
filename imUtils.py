@@ -102,22 +102,15 @@ def reverse_transform(BASE):
 	'''
 	print('--------- Calculating Reverse Transforms ---------')
 	scanpath = os.path.join(BASE, 'Scans')
+	affinepath = os.path.join(BASE, 'MNI152')
 	for scanname in os.listdir(scanpath):
 		if scanname.endswith('.nii.gz') and 'MNI' not in scanname:
+			newaffinepath = os.path.join(affinepath, scanname[:scanname.find('.nii.gz')] + '_affine.mat')
+			if not os.path.exists(newaffinepath):
+				continue
 			print(scanname)
-			affinename = scanname[:scanname.find('.nii.gz')] + '_MNI152.nii.gz'
-			if affinename not in os.listdir(scanpath):
-				continue
-			scanimgpath = os.path.join(scanpath, scanname)
-			print(scanimgpath)
-			scanimg = nib.load(scanimgpath)
-			subprocess.call(['python', 'MNI2CTAffine.py', scanimgpath])
-			imname = scanimgpath[:scanimgpath.find('.nii.gz')]+'_MNI152.nii.gz'
-			try:
-				image = nib.load(imname)
-			except:
-				print('transform didnt work')
-				continue
+			invmtxpath = os.path.join(affinepath, scanname[:scanname.find('.nii.gz')] + '_inverse.mat')
+			subprocess.call(['convert_xfm', '-omat', invmtxpath, '-inverse', newaffinepath])
 
 
 def transform_heatmaps(BASE):
@@ -126,6 +119,7 @@ def transform_heatmaps(BASE):
 	'''
 	scanpath = os.path.join(BASE, 'Scans')
 	heatpath = os.path.join(BASE, 'Heatmaps')
+	affine_path = os.path.join(BASE, 'MNI152')
 	transformed_heatpath = os.path.join(BASE, 'Transformed_Heatmaps')
 	heatimgs = os.listdir(heatpath)
 
@@ -139,8 +133,8 @@ def transform_heatmaps(BASE):
 			affinename = scanname[:scanname.find('.nii.gz')] + '_MNI152.nii.gz'
 			if affinename not in os.listdir(scanpath):
 				continue
-			nameOfInvMatrix = subjectpath[:subjectpath.find('.nii.gz')] + '_inverse.mat'
-			nameOfAffineMatrix = subjectpath[:subjectpath.find('.nii.gz')] + '_affine.mat'
+			nameOfInvMatrix = os.path.join(affine_path, scanname[:scanname.find('.nii.gz')] + '_inverse.mat')
+			nameOfAffineMatrix = os.path.join(affine_path, scanname[:scanname.find('.nii.gz')] + '_affine.mat')
 			call(['convert_xfm', '-omat', nameOfInvMatrix, '-inverse', nameOfAffineMatrix])
 			for img in heatimgs:
 				impath = os.path.join(heatpath, img)
