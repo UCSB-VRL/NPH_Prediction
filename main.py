@@ -42,13 +42,13 @@ import sys
 import argparse
 import os
 from imUtils import *
-from connecometry import *
+from connectometry import *
 from postUtils import *
 from unetSeg import *
 from predict_NPH import *
 
 
-def main(base, parallel, seg_model, gpu, save_last, clear_cache):
+def main(base, use_heatmap, gpu, predict_nph, save_last, clear_cache):
 	if clear_cache:
 		from subprocess import call
 		call(['rm', '-r', os.path.join(base, 'UNet_Outputs')])
@@ -62,7 +62,7 @@ def main(base, parallel, seg_model, gpu, save_last, clear_cache):
 			reverse_transform(base) #done
 		if use_heatmap:
 			get_heatmaps(base) #done needs testing
-			unetPredict_heatmap(base, gpu) #Amil: make this take scans from 'Scans' folder, heatmaps from 'Transformed_Heatmaps' folder, and output segmentation in 'UNet_Outputs' folder. if gpu=True, use cuda
+			unet_prob_conv(base, gpu) #Amil: make this take scans from 'Scans' folder, heatmaps from 'Transformed_Heatmaps' folder, and output segmentation in 'UNet_Outputs' folder. if gpu=True, use cuda
 		else:
 			unetPredict(base, gpu) #done
 		if predict_nph:
@@ -75,13 +75,12 @@ def main(base, parallel, seg_model, gpu, save_last, clear_cache):
 if __name__== "__main__":
 	parser = argparse.ArgumentParser()
 	parser.add_argument('--directory', default='')
-	parser.add_argument('--use_heatmap', action='store_true', default='False')
-	parser.add_argument('--parallel', action='store_true', default=False)
+	parser.add_argument('--use_heatmap', action='store_true', default=False)
 	parser.add_argument('--gpu', action='store_true', default=False)
 	parser.add_argument('--save_last', action='store_true', default=False, help='include this to append to previous csv analysis files')
 	parser.add_argument('--clear_cache', action='store_true', default=False, help='this will delete previous calculations')
 	parser.add_argument('--predict_nph', action='store_true', default=False)
 	args = parser.parse_args()
-	main(args.directory, args.parallel, args.seg_model, args.gpu, args.save_last, args.clear_cache)
+	main(args.directory, args.use_heatmap, args.gpu, args.predict_nph, args.save_last, args.clear_cache)
 
 
