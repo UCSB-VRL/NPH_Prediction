@@ -27,7 +27,7 @@ def predict_NPH(BASE, gpu):
 		dtype = torch.cuda.FloatTensor 
 		device = torch.device("cuda")
 
-	gt_segs = os.listdir(base)
+	gt_segs = os.listdir(BASE)
 	Scan_Folder = os.path.join(BASE, 'Scans')
 	scans_all = [s for s in os.listdir(Scan_Folder) if (s.endswith('nii.gz') and not 'MNI152' in s)]
 

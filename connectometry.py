@@ -39,7 +39,7 @@ def get_ventricles(BASE):
 		os.mkdir(outpath)
 
 	for f in os.listdir(path):
-		new_path = os.path.join(outpath, f)i
+		new_path = os.path.join(outpath, f)
 		if not f.endswith('.nii.gz') or os.path.exists(new_path):
 			continue
 		print(f)
@@ -52,13 +52,13 @@ def get_ventricles(BASE):
 
 
 
-def run_connectometry(BASE):
+def run_connectometry(BASE, dsi_dir):
 	'''
 	Outputs connectivity metrics of each patient.
 	'''
 	print('--------- running connectometry ----------')
 	segpath = os.path.join(BASE, 'transformed_outputs', 'ventricles')
-	dsistudio_path = os.path.join(BASE, 'dsistudio', 'build', 'dsi_studio')
+	dsistudio_path = os.path.join(dsi_dir, 'build', 'dsi_studio')
 	fibpath = os.path.join(BASE, 'template.fib.gz.mean.fib.gz')
 	outpath = os.path.join(BASE, 'connectivity_metrics')
 
@@ -66,9 +66,13 @@ def run_connectometry(BASE):
 		os.mkdir(outpath)
 
 	for f in os.listdir(segpath):
-		print(f)
 		if not f.endswith('.nii.gz'):
 			continue
 		fpath = os.path.join(segpath, f)
+		print(fpath)
+		#call(['singularity', 'exec', 'dsistudio_latest.sif', '--action=trk', '--source='+fibpath, '--seed_count=1000000', '--roa='+fpath, '--output=no_file', '--connectivity=AAL2', '>', os.path.join(outpath, 'network_measures.txt')])
 		call([dsistudio_path, '--action=trk', '--source='+fibpath, '--seed_count=1000000', '--roa='+fpath, '--output=no_file', '--connectivity=AAL2'])
-	call(['mv', '*.network_measures.txt', outpath]) 
+	move_files = [f for f in os.listdir(os.getcwd()) if f.endswith('network_measures.txt') or f.endswith('connectogram.txt')]
+	for f in move_files:
+		call(['mv', f, outpath]) 
+		call(['mv', f, outpath])
