@@ -80,11 +80,12 @@ class ConvU(nn.Module):
 
 
 class Unet(nn.Module):
-    def __init__(self, c=4, n=16, dropout=0.5, norm='gn', num_classes=5):
+    def __init__(self, c=4, n=16, dropout=0.5, norm='gn', num_classes=5, do_class = False):
         super(Unet, self).__init__()
         self.upsample = nn.Upsample(scale_factor=2,
                 mode='trilinear', align_corners=False)
 
+        self.do_class = do_class
         self.convd1 = ConvD(c,     n, dropout, norm, first=True)
         self.convd2 = ConvD(n,   2*n, dropout, norm)
         self.convd3 = ConvD(2*n, 4*n, dropout, norm)
@@ -113,6 +114,10 @@ class Unet(nn.Module):
         x3 = self.convd3(x2)
         x4 = self.convd4(x3)
         x5 = self.convd5(x4)
+
+
+        if self.do_class:
+            return x5
 
         y4 = self.convu4(x5, x4)
         y3 = self.convu3(y4, x3)

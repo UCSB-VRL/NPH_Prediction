@@ -152,7 +152,7 @@ def predict_NPH(BASE, gpu):
 	unet_model = '/home/angela/NPH/unet_ce_hard_per_im_s8841_all'
 	ckpt = 'model_last.tar'
 
-	unet = unet.Unet()
+	unet = unet.Unet(do_class = True)
 	unet.cuda()
 
 
@@ -205,6 +205,7 @@ def predict_NPH(BASE, gpu):
 		def forward(self, input, conn_data):
 			# x = self.origModel(input)
 			x = self.orig_net(input)
+			print(x.shape)
 			x = x.flatten()
 
 			x = F.relu(self.fc1(x))
@@ -219,6 +220,7 @@ def predict_NPH(BASE, gpu):
 	X_test = X[0]
 	conn_test = conn_metric.astype(float)
 	model_class = BinaryClass(net)
+	model_class.load_state_dict(torch.load('NPH_Prediction.pt'))
 	if gpu:
 		model_class.cuda()
 
@@ -227,7 +229,7 @@ def predict_NPH(BASE, gpu):
 
 	test_x = torch.Tensor(X_test[None,:]).to(device)
 	test_conn = torch.Tensor(conn_test[None,:,0]).to(device)
-	import ipdb; ipdb.set_trace()
+	# import ipdb; ipdb.set_trace()
 	with torch.no_grad():
 		output = model_class(test_x, test_conn)
 
