@@ -68,7 +68,7 @@ def main(base, use_heatmap, gpu, predict_nph, save_last, clear_cache):
 		if predict_nph:
 			transform_seg(base) #done
 			get_ventricles(base) #done
-			run_connectomectry(base) #done needs testing
+			run_connectometry(base) #done needs testing
 			predict_NPH(base, gpu)
 		clean_up(base)
 	
