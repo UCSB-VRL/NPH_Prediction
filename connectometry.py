@@ -72,7 +72,10 @@ def run_connectometry(BASE, dsi_dir):
 		print(fpath)
 		#call(['singularity', 'exec', 'dsistudio_latest.sif', '--action=trk', '--source='+fibpath, '--seed_count=1000000', '--roa='+fpath, '--output=no_file', '--connectivity=AAL2', '>', os.path.join(outpath, 'network_measures.txt')])
 		call([dsistudio_path, '--action=trk', '--source='+fibpath, '--seed_count=1000000', '--roa='+fpath, '--output=no_file', '--connectivity=AAL2'])
-	move_files = [f for f in os.listdir(os.getcwd()) if f.endswith('network_measures.txt') or f.endswith('connectogram.txt')]
+	move_files = [f for f in os.listdir(os.getcwd()) if f.endswith('network_measures.txt') or f.endswith('connectogram.mat')]
+	new_path = os.path.join(outpath, f+'network_measures.txt')
 	for f in move_files:
-		call(['mv', f, outpath]) 
-		call(['mv', f, outpath])
+		if f.endswith('connectogram.mat'):
+			call(['rm', f])
+		else:
+			call(['mv', f, new_path]) 

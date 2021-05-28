@@ -4,20 +4,15 @@ import nibabel as nib
 import torch.nn as nn
 import torch.nn.functional as F
 import torch
-import torch.optim as optim
 import tarfile
 import nibabel as nib
-import shutil
 from skimage.transform import rescale, resize, downscale_local_mean
-import ipdb
 import pickle
 import pandas as pd
 import skorch
 from skorch import NeuralNetClassifier, NeuralNet, NeuralNetBinaryClassifier
 from sklearn.metrics import classification_report
-from skorch.helper import SliceDataset
 import sys
-import models
 from models import criterions, unet
 
 
@@ -27,7 +22,6 @@ def predict_NPH(BASE, gpu):
 		dtype = torch.cuda.FloatTensor 
 		device = torch.device("cuda")
 
-	gt_segs = os.listdir(BASE)
 	Scan_Folder = os.path.join(BASE, 'Scans')
 	scans_all = [s for s in os.listdir(Scan_Folder) if (s.endswith('nii.gz') and not 'MNI152' in s)]
 
@@ -49,8 +43,8 @@ def predict_NPH(BASE, gpu):
 			scanname = scans_all[j]
 			scanpath = os.path.join(Scan_Folder, scanname)
 			print(scanname)
-			conn_metric_path = os.path.join(scanname, 'network_measures.txt')
-			conn_metrics = df = pd.read_csv(conn_metric_path, delimiter = "\t", nrows=27)
+			conn_metric_path = os.path.join('connectivity_metrics', scanname[:scanname.find('.nii.gz')] + '.segmented.nii.gznetwork_measures.txt')
+			conn_metrics = df = pd.read_csv(conn_metric_path, delimiter = "\t", nrows=26)
 			if conn_metric.size == 0:
 				conn_metric = conn_metrics.iloc[:,1:].to_numpy()
 			else:
@@ -153,13 +147,12 @@ def predict_NPH(BASE, gpu):
 
 
 	''' Loading unet '''
-
 	from models import criterions, unet
 
 	unet_model = '/home/angela/NPH/unet_ce_hard_per_im_s8841_all'
 	ckpt = 'model_last.tar'
 
-	unet = unet.Unet(do_class = True)
+	unet = unet.Unet()
 	unet.cuda()
 
 
@@ -223,29 +216,28 @@ def predict_NPH(BASE, gpu):
 			return x
 
 
-	for i in range(X.shape[0]):
-		X_test = X[i]
-		conn_test = conn_metric[i][:,:-1].astype(float)
-		model_class = BinaryClass(net)
-		if gpu:
-			model_class.cuda()
+	X_test = X[0]
+	conn_test = conn_metric.astype(float)
+	model_class = BinaryClass(net)
+	if gpu:
+		model_class.cuda()
 
-		model_class.eval()
-		test_outputs = np.empty(0)
+	model_class.eval()
+	test_outputs = np.empty(0)
 
-		test_x = torch.Tensor(X_test[i, : ,: ,: ,:][None,:]).to(device)
-		test_conn = torch.Tensor(conn_test[i,:][None,:]).to(device)
+	test_x = torch.Tensor(X_test[None,:]).to(device)
+	test_conn = torch.Tensor(conn_test[None,:,0]).to(device)
+	import ipdb; ipdb.set_trace()
+	with torch.no_grad():
+		output = model_class(test_x, test_conn)
 
-		with torch.no_grad():
-			output = model_class(test_x, test_conn)
-
-		output_thresh = output
-		output_thresh[output_thresh >= 0.5] = 1
-		output_thresh[output_thresh < 0.5] = 0
-		output_thresh = output_thresh.detach().cpu().numpy()
-		
-		if(test_outputs.size == 0):
-			test_outputs = np.asarray([output_thresh])
-		else:
-			test_outputs = np.concatenate((test_outputs, [output_thresh]), axis = 0)
-
+	output_thresh = output
+	output_thresh[output_thresh >= 0.5] = 1
+	output_thresh[output_thresh < 0.5] = 0
+	output_thresh = output_thresh.detach().cpu().numpy()
+	
+	if(test_outputs.size == 0):
+		test_outputs = np.asarray([output_thresh])
+	else:
+		test_outputs = np.concatenate((test_outputs, [output_thresh]), axis = 0)
+	print(test_outputs)
