@@ -117,6 +117,7 @@ def transform_heatmaps(BASE):
 	'''
 	Transforms heatmaps into original subject space.
 	'''
+	print('--------- Creating Heatmaps ---------')
 	scanpath = os.path.join(BASE, 'Scans')
 	heatpath = os.path.join(BASE, 'Heatmaps')
 	affine_path = os.path.join(BASE, 'MNI152')
@@ -131,12 +132,13 @@ def transform_heatmaps(BASE):
 			print(scanname)
 			subjectpath = os.path.join(scanpath, scanname)
 			affinename = scanname[:scanname.find('.nii.gz')] + '_MNI152.nii.gz'
-			if affinename not in os.listdir(scanpath):
+			if affinename not in os.listdir(affine_path):
 				continue
 			nameOfInvMatrix = os.path.join(affine_path, scanname[:scanname.find('.nii.gz')] + '_inverse.mat')
 			nameOfAffineMatrix = os.path.join(affine_path, scanname[:scanname.find('.nii.gz')] + '_affine.mat')
-			call(['convert_xfm', '-omat', nameOfInvMatrix, '-inverse', nameOfAffineMatrix])
-			for img in heatimgs:
+			subprocess.call(['convert_xfm', '-omat', nameOfInvMatrix, '-inverse', nameOfAffineMatrix])
+			for i in range(len(heatimgs)):
+				img = heatimgs[i]
 				impath = os.path.join(heatpath, img)
-				outpath = os.path.join(transformed_heatpath, img)
+				outpath = os.path.join(transformed_heatpath, scanname[:scanname.find('.nii.gz')] + str(i) + '.nii.gz')
 				subprocess.call(['flirt','-in', impath, '-ref', subjectpath, '-applyxfm', '-init', nameOfInvMatrix, '-out', outpath, '-interp', 'nearestneighbour'])

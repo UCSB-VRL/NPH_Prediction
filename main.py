@@ -61,8 +61,8 @@ def main(base, use_heatmap, gpu, predict_nph, dsi_dir, save_last, clear_cache):
 			affine_transform(base) #done
 			reverse_transform(base) #done
 		if use_heatmap:
-			get_heatmaps(base) #done needs testing
-			unet_prob_conv(base, gpu) #Amil: make this take scans from 'Scans' folder, heatmaps from 'Transformed_Heatmaps' folder, and output segmentation in 'UNet_Outputs' folder. if gpu=True, use cuda
+			transform_heatmaps(base) #done needs testing
+			#unet_prob_conv(base, gpu) #Amil: make this take scans from 'Scans' folder, heatmaps from 'Transformed_Heatmaps' folder, and output segmentation in 'UNet_Outputs' folder. if gpu=True, use cuda
 		else:
 			#unetPredict(base, gpu) #done
 			print('done with seg')
@@ -70,7 +70,7 @@ def main(base, use_heatmap, gpu, predict_nph, dsi_dir, save_last, clear_cache):
 			transform_seg(base) #done
 			get_ventricles(base) #done
 			#run_connectometry(base, dsi_dir) #done
-			predict_NPH(base, gpu)
+			predict_NPH(base, gpu) #done needs retrain
 		clean_up(base)
 	
   
