@@ -46,12 +46,12 @@ and
 
 To run with default settings (recommended), type
 ```
-python3 nph_prediction.py
+python3 main.py
 ```
 
 For help on the settings, type
 ```
-python3 nph_prediction.py -h
+python3 main.py -h
 ```
 
 The runtime is approximately 5 minutes per image with GPU.
