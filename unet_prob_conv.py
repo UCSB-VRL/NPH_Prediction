@@ -12,11 +12,7 @@ import tarfile
 import nibabel as nib
 import shutil
 from skimage.transform import rescale, resize, downscale_local_mean
-import ipdb
-from sklearn.model_selection import KFold
 import pickle
-import pdb
-# from numba import jit, vectorize, int32
 
 from torchvision.datasets.folder import DatasetFolder
 from torch.utils.data import Dataset, DataLoader
@@ -24,9 +20,6 @@ import torch.distributed as dist
 import torch.nn as nn
 import torch.optim as optim
 import torch.multiprocessing as mp
-from torch.cuda.amp import autocast
-from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.utils.tensorboard import SummaryWriter
 
 import models 
 from models.unet_vikram_prob_conv import Unet
@@ -35,32 +28,38 @@ from models import criterions
 torch.backends.cudnn.benchmark = True
 
 
+#  +----------------------------------------------------------------------------------+    
+#  | Parameters for Running Inference                                                 |
+#  +----------------------------------------------------------------------------------+    
 
 dtype = torch.FloatTensor
 do_yellow = False
+
+# Ground Truth Segmentations Folder
 GT_Folder = 'UCISegmentations'
+
+# Input Directory
 Scan_Folder = 'Scans'
 
-
-do_prep = False
-N = 256
-N1 = 128
-batch_size = 1
-num_epochs = 500
-start_k = 0
+# Model Parameters
+do_prep       = False
+N             = 256
+N1            = 128
+batch_size    = 1
+num_epochs    = 500
+start_k       = 0
 reload_k_epoch = False
-reload_k = 4
-reload_l = 175
-lr = 0.001
-num_classes = 7
-use_amp = True
+reload_k      = 4
+reload_l      = 175
+lr            = 0.001
+num_classes   = 7
 
-
-kfold = KFold(shuffle=True)
+# Model Criterion
 #crit = 'weighted_hard'
 crit = 'hard_per_im'
 
 
+#  +----------------------------------------------------------------------------------+    
 
 
 class NPHDataset(Dataset):
@@ -69,7 +68,7 @@ class NPHDataset(Dataset):
     +----------------------------------------------------------------------------------+    
     
         Normal Pressure Hydrocephalus (NPH) Dataset
-        Authors/Maintainers: Angela Zhang, Vikram [James], Amil Khan
+        Authors/Maintainers: Angela Zhang, Vikram Iyer, Amil Khan
 
 
         Designed for loading CT scans for predicting NPH, this function
@@ -245,7 +244,6 @@ nn.init.uniform_(unet.prob_conv.bn2.weight)
 nn.init.uniform_(unet.prob_conv.bn2.bias)
 print('Weights initialized')
 #loads weights 
-#ipdb.set_trace()
 
 def normalization(planes, norm='gn'):
 	if norm == 'bn':
@@ -268,7 +266,6 @@ elif crit == 'weighted_BCE':
 elif crit == 'weighted_hard':
 	criterion = criterions.weighted_hard
 
-# Vikram's masterpiece I think
 class ConvD(nn.Module):
 	def __init__(self, inplanes, planes, dropout=0.0, norm='gn', first=False):
 		super(ConvD, self).__init__()
@@ -398,238 +395,43 @@ def dice_score(ml_segarray, gt_segarray):
     return dice_vent, dice_wm, dice_sub
 
 
-# Writer will output to ./runs/ directory by default
-#writer = SummaryWriter(comment='-prob_conv')
+
+testloader = torch.utils.data.DataLoader(
+                  nph_dataset, num_workers=8, pin_memory=True, 
+                  batch_size=batch_size)
+
+print("---> Successfully Loaded Trainloader and Testloader...")
+
+# Init the neural network
+net.to('cuda')
+
+print("---> Successfully Initialized Network on GPU...")
+
+# Initialize optimizer
+lr = 0.001
+optimizer = optim.Adam(net.parameters(), lr=lr, amsgrad=True, weight_decay=0.0001)
 
 
-for fold, (train_ids, test_ids) in enumerate(kfold.split(nph_dataset)):
     
+# Run Inference    
+net.eval()
+with torch.no_grad():
 
-    # Writer will output to ./runs/ directory by default
-    writer = SummaryWriter(comment=f'-prob_conv-FOLD-{fold}')
-    
-    # Print current Fold
-    print('='*50)
-    print(f'FOLD {fold}')
-    print('='*50)
-    
-
-    # Sample elements randomly from a given list of ids, no replacement.
-    train_subsampler = torch.utils.data.SubsetRandomSampler(train_ids)
-    test_subsampler = torch.utils.data.SubsetRandomSampler(test_ids)
-
-    # Define dataloaders for training and testing data in this fold
-    trainloader = torch.utils.data.DataLoader(
-                      nph_dataset, num_workers=20, pin_memory=True, batch_size=batch_size,
-                      sampler=train_subsampler)
-    testloader = torch.utils.data.DataLoader(
-                      nph_dataset, num_workers=8, pin_memory=True, 
-                      batch_size=batch_size, sampler=test_subsampler)
-
-    print("---> Successfully Loaded Trainloader and Testloader...")
-    
-    # Init the neural network
-    net.to('cuda')
-    
-    print("---> Successfully Initialized Network on GPU...")
-    
-    # Initialize optimizer
-    lr = 0.001
-    optimizer = optim.Adam(net.parameters(), lr=lr, amsgrad=True, weight_decay=0.0001)
-    scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
-    
-    
-    loss_track_train    = []
-    loss_track_test     = []
-    dice_vent_train     = []
-    dice_cerebral_train = []
-    dice_sub_train      = []
-    dice_vent_test      = []
-    dice_cerebral_test  = []
-    dice_sub_test       = []
-    epochs_per_score    = []
-    
-    
-    
-    
-    # Run the training loop for defined number of epochs
-    for l in range(num_epochs):
+    num_test = len(test_ids)
+    for i, data in enumerate(testloader, 0):
+        # info, inputs, labels, weights, scan_name = data
+        inputs    = data['inputs'].to('cuda', non_blocking=True)
+        scan_name = data['scan_name'][0]
+        labels    = data['labels'].to('cuda', non_blocking=True)
         
-        # Record Average Train Loss and Average Dice Scores
-        avg_loss_train          = 0.0
-        avg_loss_test           = 0.0
-        avg_dice_vent_train     = 0.0
-        avg_dice_cerebral_train = 0.0
-        avg_dice_sub_train      = 0.0
-        avg_dice_vent_test      = 0.0
-        avg_dice_cerebral_test  = 0.0
-        avg_dice_sub_test       = 0.0
+        outputs = net(inputs, scan_name)
         
-
-        # Print epoch
-        print(f'\nStarting Epoch {l+1}')
-        print('-'*50)
-
-        # Set current loss value
-        current_loss = 0.0
-
-        # Iterate over the DataLoader for training data
-        for i, data in enumerate(trainloader, 0):
-
-            # Get the inputs
-            # _, inputs, labels, weights, scan_name = data
-            
-            inputs    = data['inputs'].to('cuda', non_blocking=True)
-            scan_name = data['scan_name'][0]
-            labels    = data['labels'].to('cuda', non_blocking=True)
-
-            # Runs the forward pass under autocast    
-            with autocast(enabled=use_amp):
-            
-                # Perform Forward Pass    
-                outputs = net(inputs, scan_name)
-                # assert outputs.dtype is torch.float16
-            
-                # Compute Loss
-                if crit.startswith('weighted'):
-                    loss = criterion(outputs, labels, weights)
-                else:
-                    loss = criterion(outputs, labels)
-            # Print statistics
-            current_loss += loss.item()
-            print("Current Loss: ", current_loss)
-            
-
-            # Perform Backward Pass
-            scaler.scale(loss).backward()
-            
-            # Perform Optimization
-            scaler.step(optimizer)
-            scaler.update()
-            
-            # Zero the Gradient and set to None
-            optimizer.zero_grad(set_to_none=True)
-            print(f'Done with {i}')
-
-        # Update Loss every Epoch
-        writer.add_scalar('Loss', current_loss, l)
-
-                
-        if l%5==0 and (l > 20):
-            torch.save(net.state_dict(), 'trials/kfold_'+str(fold)+'_unet_drop.5_lr0.001_tv_w1_PT_hard_epoch_' + str(l)+'.pt')
-
-        if l%20==0: 
-            net.eval()
-            with torch.no_grad():
-                num_train = len(train_ids)
-                for i, data in enumerate(trainloader, 0):
-                    #info, inputs, labels, weights, scan_name = data
-                    inputs    = data['inputs'].to('cuda', non_blocking=True)
-                    scan_name = data['scan_name'][0]
-                    labels    = data['labels'].to('cuda', non_blocking=True)
-                    
-                    outputs = net(inputs,scan_name)
-                    
-                    if crit.startswith('weighted'):
-                        loss = criterion(outputs, labels, weights)
-                    else:
-                        loss = criterion(outputs, labels)
-                    avg_loss_train += loss.item()
-                    #dice
-                    outputs = get_mask_from_output(outputs, data['img_info'])
-                    dice_vent, dice_wm, dice_sub = dice_score(outputs, np.squeeze(labels.cpu().detach().numpy()))
-                    avg_dice_vent_train += dice_vent
-                    avg_dice_cerebral_train += dice_wm
-                    avg_dice_sub_train += dice_sub
-
-                    writer.add_scalar('Ventricle Dice Score', dice_vent, i)
-                    writer.add_scalar('Cerebral Dice Score', dice_wm, i)
-                    writer.add_scalar('Subcortical Dice Score', dice_sub, i)
-
-                loss_track_train.append(avg_loss_train/(i+1))
-                dice_cerebral_train.append(avg_dice_cerebral_train/(i+1))
-                dice_vent_train.append(avg_dice_vent_train/(i+1))
-                dice_sub_train.append(avg_dice_sub_train/(i+1))
-                
-                if avg_dice_cerebral_train/(i+1) > 1:
-                    ipdb.set_trace()
-
-
-                print(f'\nFOLD {fold} | TRAIN LOSS SUMMARY')
-                print('-'*50)
-                print(
-                    f' Train: Average Loss            {avg_loss_train/(i+1)}\n',
-                    f'Train: Cerebral Dice Score     {avg_dice_cerebral_train/(i+1)}\n',
-                    f'Train: Ventricle Dice Score    {avg_dice_vent_train/(i+1)}\n',
-                    f'Train: Subcortical Dice Score  {avg_dice_sub_train/(i+1)}',
-                )
-                print('-'*50)
-
-
-                writer.add_scalar('Train: Average Loss', avg_loss_train/(i+1), l)
-                writer.add_scalar('Train: Average Cerebral Dice Score', avg_dice_cerebral_train/(i+1), l)
-                writer.add_scalar('Train: Average Subcortical Dice Score', avg_dice_sub_train/(i+1), l)
-                writer.add_scalar('Train: Ventricle Dice Score', avg_dice_vent_train/(i+1), l)
-
-
-                num_test = len(test_ids)
-                for i, data in enumerate(testloader, 0):
-                    # info, inputs, labels, weights, scan_name = data
-                    inputs    = data['inputs'].to('cuda', non_blocking=True)
-                    scan_name = data['scan_name'][0]
-                    labels    = data['labels'].to('cuda', non_blocking=True)
-                    
-                    outputs = net(inputs, scan_name)
-                    
-                    if crit.startswith('weighted'):
-                        loss = criterion(outputs, labels, weights)
-                    else:
-                        loss = criterion(outputs, labels)
-                    avg_loss_test += loss.item()
-                    # Dice Score
-                    outputs = get_mask_from_output(outputs, data['img_info'])
-                    dice_vent, dice_wm, dice_sub = dice_score(outputs, np.squeeze(labels.cpu().detach().numpy()))
-                    avg_dice_vent_test += dice_vent
-                    avg_dice_cerebral_test += dice_wm
-                    avg_dice_sub_test += dice_sub
-                loss_track_test.append(avg_loss_test/(i+1))
-                dice_vent_test.append(avg_dice_vent_test/(i+1))
-                dice_cerebral_test.append(avg_dice_cerebral_test/(i+1))
-                dice_sub_test.append(avg_dice_sub_test/(i+1))
-                epochs_per_score.append(l)
-
-                writer.add_scalar('Test: Average Loss', avg_loss_test/(i+1), l)
-                writer.add_scalar('Test: Average Cerebral Dice Score', avg_dice_cerebral_test/(i+1), l)
-                writer.add_scalar('Test: Average Subcortical Dice Score', avg_dice_sub_test/(i+1), l)
-                writer.add_scalar('Test: Ventricle Dice Score', avg_dice_vent_test/(i+1), l)
-
-
-                print(f'\nFOLD {fold} | TEST LOSS SUMMARY')
-                print('-'*50)
-                print(
-                    f' Test: Average Loss            {avg_loss_test/(i+1)}\n',
-                    f'Test: Cerebral Dice Score     {avg_dice_cerebral_test/(i+1)}\n',
-                    f'Test: Ventricle Dice Score    {avg_dice_vent_test/(i+1)}\n',
-                    f'Test: Subcortical Dice Score  {avg_dice_sub_test/(i+1)}',
-                )
-                print('-'*50)
-
-
-    np.save('scores/w1_PT_hard_loss_train'+str(fold)+'.npy', loss_track_train)
-    np.save('scores/w1_PT_hard_loss_test'+str(fold)+'.npy', loss_track_test)
-    np.save('scores/w1_PT_hard_dice_vent_train'+str(fold)+'.npy', dice_vent_train)
-    np.save('scores/w1_PT_hard_dice_vent_test'+str(fold)+'.npy', dice_vent_test)
-    np.save('scores/w1_PT_hard_dice_cerebral_train'+str(fold)+'.npy', dice_cerebral_train)
-    np.save('scores/w1_PT_hard_dice_cerebral_test'+str(fold)+'.npy', dice_cerebral_test)
-    np.save('scores/w1_PT_hard_dice_sub_train'+str(fold)+'.npy', dice_sub_train)
-    np.save('scores/w1_PT_hard_dice_sub_test'+str(fold)+'.npy', dice_sub_test)
-    np.save('scores/w1_PT_hard_epochs_per_score'+str(fold)+'.npy', epochs_per_score)
-
-print('='*50)
-print('='*50)
-print('---> TRAINING COMPLETE! <---')
-print('='*50)
-print('='*50)
+        if crit.startswith('weighted'):
+            loss = criterion(outputs, labels, weights)
+        else:
+            loss = criterion(outputs, labels)
+        avg_loss_test += loss.item()
+        outputs = get_mask_from_output(outputs, data['img_info'])
 
 
 
