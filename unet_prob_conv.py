@@ -332,68 +332,6 @@ def get_mask_from_output(output, info):
 	return output
 
 
-def dice_score(ml_segarray, gt_segarray):
-    """
-    Computes the Dice Score
-
-
-    Parameters
-    ----------
-    ml_segarray : Numpy Array
-
-    gt_segarray : Numpy Array
-
-
-    Returns
-    -------
-    dice_vent : Float
-
-    dice_wm   : Float
-
-    dice_sub  : Float
-    """
-    ml_vent = np.zeros(ml_segarray.shape)
-    ml_vent[np.where(ml_segarray == 1)] = 1
-    gt_vent = np.zeros(gt_segarray.shape)
-    if gt_vent.shape != gt_segarray.shape or gt_vent.shape != ml_vent.shape:
-        ipdb.set_trace()
-    gt_vent[np.where(gt_segarray == 1)] = 1
-    TP_vent = np.sum(np.logical_and(gt_vent, ml_vent))
-    gt_no_vent = 1 - gt_vent
-    FP_vent = np.sum(np.logical_and(gt_no_vent, ml_vent))
-    ml_no_vent = 1 - ml_vent
-    TN_vent = np.sum(np.logical_and(gt_no_vent, ml_no_vent))
-    FN_vent = np.sum(np.logical_and(gt_vent, ml_no_vent))
-
-    ml_wm = np.zeros(ml_segarray.shape)
-    ml_wm[np.where(ml_segarray == 2)] = 1
-    gt_wm = np.zeros(gt_segarray.shape)
-    gt_wm[np.where(gt_segarray == 2)] = 1
-    TP_wm = np.sum(np.logical_and(ml_wm,gt_wm))
-    gt_no_wm = 1 - gt_wm
-    FP_wm = np.sum(np.logical_and(gt_no_wm, ml_wm))
-    ml_no_wm = 1 - ml_wm
-    TN_wm = np.sum(np.logical_and(gt_no_wm, ml_no_wm))
-    FN_wm = np.sum(np.logical_and(gt_wm, ml_no_wm))
-
-    ml_sub = np.zeros(ml_segarray.shape)
-    ml_sub[np.where(ml_segarray == 3)] = 1
-    gt_sub = np.zeros(gt_segarray.shape)
-    gt_sub[np.where(gt_segarray == 3)] = 1
-    TP_sub = np.sum(np.logical_and(ml_sub,gt_sub))
-    gt_no_sub = 1 - gt_sub
-    FP_sub = np.sum(np.logical_and(gt_no_sub, ml_sub))
-    ml_no_sub = 1 - ml_sub
-    TN_sub = np.sum(np.logical_and(gt_no_sub, ml_no_sub))
-    FN_sub = np.sum(np.logical_and(gt_sub, ml_no_sub))
-
-    dice_vent = TP_vent / np.mean([np.sum(gt_vent), np.sum(ml_vent)])
-    dice_wm = TP_wm / np.mean([np.sum(gt_wm), np.sum(ml_wm)])
-    dice_sub = TP_sub / np.mean([np.sum(gt_sub), np.sum(ml_sub)])
-    if dice_vent > 1 or dice_wm > 1 or dice_sub > 1:
-        ipdb.set_trace()
-    return dice_vent, dice_wm, dice_sub
-
 
 
 testloader = torch.utils.data.DataLoader(
