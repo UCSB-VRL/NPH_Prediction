@@ -23,7 +23,7 @@ def transform_seg(BASE):
 			continue
 		print(seg)
 		transformed_name = os.path.join(transformed_segpath, seg)
-		call(['flirt', '-in', full_segpath, '-ref', MNI_152, '-applyxfm', '-init', affine_mtx, '-out', transformed_name])
+		call(['flirt', '-in', full_segpath, '-ref', MNI_152, '-applyxfm', '-init', affine_mtx, '-out', transformed_name, '-interp', 'nearestneighbour'])
 		
 
 
