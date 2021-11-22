@@ -59,20 +59,21 @@ def main(base, use_heatmap, gpu, predict_nph, dsi_dir, save_last, clear_cache):
 
 	else:
 		if use_heatmap or predict_nph:
-			affine_transform(base) #done
-			reverse_transform(base) #done
+			affine_transform(base)
+			reverse_transform(base)
 		if use_heatmap:
-			transform_heatmaps(base) #done
-			unetProbPredict(base, gpu) #done
+			transform_heatmaps(base)
+			unetProbPredict(base, gpu)
 			print('done with prob seg')
 		else:
-			unetPredict(base, gpu) #done
+			unetPredict(base, gpu)
 			print('done with seg')
 		if predict_nph:
-			transform_seg(base) #done
-			get_ventricles(base) #done
-			run_connectometry(base, dsi_dir) #done
-			predict_NPH(base) #done
+			transform_seg(base)
+			get_ventricles(base)
+			run_connectometry(base, dsi_dir)
+			get_volumes(base, save_last=False)
+			predict_NPH(base)
 		clean_up(base)
 	
   
