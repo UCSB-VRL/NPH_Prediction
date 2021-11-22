@@ -49,7 +49,7 @@ from sklearn.ensemble import RandomForestClassifier as rf_classifier
 from sklearn import preprocessing
 
 
-def get_volumes(BASE, seg_model, save_last=False):
+def get_volumes(BASE):
 	'''
 	Obtains the volumes of the ventricle, subarachnoid space, and white matter given segmentations.
 	Volumes are output in a csv file.
@@ -57,10 +57,7 @@ def get_volumes(BASE, seg_model, save_last=False):
 	print('------------ getting volumes ---------------')
 	imnames = pickle.load(open(os.path.join(BASE,'imname_list.pkl'), 'rb'))
 	imnames.sort()
-	if seg_model == 'mcv':
-		volume_csv = os.path.join(BASE, 'volumes_mcv.csv')
-	elif seg_model == 'unet':
-		volume_csv = os.path.join(BASE, 'volumes_unet.csv')
+	volume_csv = os.path.join(BASE, 'volumes.csv')
 	csv_exists = os.path.exists(volume_csv)
 	if save_last:
 		f = open(volume_csv, 'a')
@@ -76,13 +73,10 @@ def get_volumes(BASE, seg_model, save_last=False):
 	for imname in imnames:
 		imname_short = os.path.split(imname)[-1]
 		print(imname_short)
-		if seg_model == 'unet':
-			final_pred = 'UNet_Outputs'
-		else:
-			final_pred = 'Final_Predictions'
+		final_pred = 'UNet_Outputs'
 		seg_name = os.path.join(BASE,
-							final_pred,
-							imname_short[:imname_short.find('.nii.gz')] + '.segmented1.nii.gz')
+					final_pred,
+					imname_short[:imname_short.find('.nii.gz')] + '.segmented1.nii.gz')
 
 		if not os.path.exists(seg_name):
 			print('skipping due to no segmentation')
