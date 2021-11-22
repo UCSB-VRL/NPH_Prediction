@@ -72,7 +72,7 @@ def main(base, use_heatmap, gpu, predict_nph, dsi_dir, save_last, clear_cache):
 			transform_seg(base)
 			get_ventricles(base)
 			run_connectometry(base, dsi_dir)
-			get_volumes(base, save_last=False)
+			get_volumes(base)
 			predict_NPH(base)
 		clean_up(base)
 	
