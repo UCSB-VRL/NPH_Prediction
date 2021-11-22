@@ -59,13 +59,9 @@ def get_volumes(BASE):
 	imnames.sort()
 	volume_csv = os.path.join(BASE, 'volumes.csv')
 	csv_exists = os.path.exists(volume_csv)
-	if save_last:
-		f = open(volume_csv, 'a')
-	else:
-		f = open(volume_csv, 'w')
+	f = open(volume_csv, 'w')
 	writer = csv.writer(f)
-	if not csv_exists or not save_last:
-		writer.writerow(['Scan', 'Vent', 'Sub', 'White'])
+	writer.writerow(['Scan', 'Vent', 'Sub', 'White'])
 	ventricle_volumes = []
 	sub_volumes = []
 	white_volumes = []
