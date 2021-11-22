@@ -49,7 +49,7 @@ from sklearn.ensemble import RandomForestClassifier as rf_classifier
 from sklearn import preprocessing
 
 
-def get_volumes(BASE, save_last=False):
+def get_volumes(BASE, seg_model, save_last=False):
 	'''
 	Obtains the volumes of the ventricle, subarachnoid space, and white matter given segmentations.
 	Volumes are output in a csv file.
@@ -57,7 +57,10 @@ def get_volumes(BASE, save_last=False):
 	print('------------ getting volumes ---------------')
 	imnames = pickle.load(open(os.path.join(BASE,'imname_list.pkl'), 'rb'))
 	imnames.sort()
-	volume_csv = os.path.join(BASE, 'volumes.csv')
+	if seg_model == 'mcv':
+		volume_csv = os.path.join(BASE, 'volumes_mcv.csv')
+	elif seg_model == 'unet':
+		volume_csv = os.path.join(BASE, 'volumes_unet.csv')
 	csv_exists = os.path.exists(volume_csv)
 	if save_last:
 		f = open(volume_csv, 'a')
@@ -65,7 +68,7 @@ def get_volumes(BASE, save_last=False):
 		f = open(volume_csv, 'w')
 	writer = csv.writer(f)
 	if not csv_exists or not save_last:
-		writer.writerow(['Scan', 'Vent', 'Sub', 'White', 'All'])
+		writer.writerow(['Scan', 'Vent', 'Sub', 'White'])
 	ventricle_volumes = []
 	sub_volumes = []
 	white_volumes = []
@@ -73,10 +76,13 @@ def get_volumes(BASE, save_last=False):
 	for imname in imnames:
 		imname_short = os.path.split(imname)[-1]
 		print(imname_short)
-		final_pred = 'UNet_Outputs'
+		if seg_model == 'unet':
+			final_pred = 'UNet_Outputs'
+		else:
+			final_pred = 'Final_Predictions'
 		seg_name = os.path.join(BASE,
-					final_pred,
-					imname_short[:imname_short.find('.nii.gz')] + '.segmented1.nii.gz')
+							final_pred,
+							imname_short[:imname_short.find('.nii.gz')] + '.segmented1.nii.gz')
 
 		if not os.path.exists(seg_name):
 			print('skipping due to no segmentation')
@@ -106,23 +112,28 @@ def get_volumes(BASE, save_last=False):
 			white_volumes.append(float(white_matter))
 
 		whole_brain = float(ventricle+subarachnoid+white_matter)
-		writer.writerow([imname_short, str(ventricle), str(subarachnoid), str(white_matter), str(whole_brain)])
+		writer.writerow([imname_short, str(ventricle), str(subarachnoid), str(white_matter)])
 	f.close()
 
 
-def make_prediction(BASE, seg_model):
+def make_prediction(BASE):
 	'''
 	Makes predictions of possible NPH/no NPH given the volume information obtained by get_volumes, output to predictions_$model$.csv.
 	model options: linear_svm, rbf_svm, rf
 	'''
 	print('------------ making prediction -------------')
 	#load classifier
-	classifier_name = 'svm.pkl'
-	vol_name = 'volumes.csv'
+	classifier_name = 'conn_model.pkl'
+	vol_name = 'volumes_unet.csv'
 	with open(os.path.join(BASE, 'nph_classifiers', classifier_name), 'rb') as f:
 		clf = pickle.load(f)
 	#load and process ratio data from csv file
 	dfvol = pandas.read_csv(os.path.join(BASE, vol_name))
+	df_conn = pandas.read_csv('vikram/dataset.txt')
+	df_conn.drop(list(df_conn.filter(regex = '(binary)')), axis = 1, inplace = True)
+	df_conn['file_name'] = df_conn['file_name'].str.replace('.trk.gz.AAL2.count.end.network_measures.txt', '.nii.gz')
+	dfvol['Scan'] = dfvol['Scan'].str.replace(' ', '')
+	dfvol = dfvol.merge(df_conn, left_on='Scan', right_on='file_name')
 	predictions_csv = os.path.join(BASE,'predictions.csv')
 	f = open(predictions_csv, 'w')
 	writer = csv.writer(f)
@@ -132,7 +143,16 @@ def make_prediction(BASE, seg_model):
 		vent = corresp_row_ratio['Vent']
 		sub = corresp_row_ratio['Sub']
 		white = corresp_row_ratio['White']
-		x = np.array([[vent, sub, white, vent+sub+white]]).reshape(1,-1)
+		density = float(corresp_row_ratio['density'])
+		cca = float(corresp_row_ratio['clustering_coeff_average(weighted)'])
+		transitivity = float(corresp_row_ratio['transitivity(weighted)'])
+		ncpl = float(corresp_row_ratio['network_characteristic_path_length(weighted)'])
+		sw = float(corresp_row_ratio['small-worldness(weighted)'])
+		ge = float(corresp_row_ratio['global_efficiency(weighted)'])
+		dog = float(corresp_row_ratio['diameter_of_graph(weighted)'])
+		rog = float(corresp_row_ratio['radius_of_graph(weighted)'])
+		assortativity = float(corresp_row_ratio['assortativity_coefficient(weighted)'])
+		x = np.array([[vent, sub, white, vent+sub+white, density, cca, transitivity, ncpl, sw, ge, dog, rog, assortativit]]).reshape(1,-1)
 		x = preprocessing.scale(x, axis=1)
 		predict_num = clf.predict(x)[0]
 		if predict_num == 1:
