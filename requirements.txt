@@ -1,6 +1,6 @@
 joblib==0.14.0
 nibabel==3.0.0
-numpy==1.18.1
+numpy==1.22.0
 opencv-python==4.1.2.30
 pandas==0.25.3
 scikit-image==0.16.1
